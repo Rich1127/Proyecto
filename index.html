@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>Juego Latas Reciclables</title>
+  <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+  <script src="https://unpkg.com/aframe-extras@6.1.1/dist/aframe-extras.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/aframe-physics-system@4.0.1/dist/aframe-physics-system.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/aframe-super-hands-component@4.0.5/dist/aframe-super-hands-component.min.js"></script>
+  <style>
+    #contador, #reset-top {
+      position: fixed;
+      font-family: Arial;
+      z-index: 1000;
+    }
+    #contador {
+      top: 10px; left: 10px;
+      background: rgba(255,255,255,0.8);
+      font-size: 24px; padding: 8px;
+    }
+    #reset-top {
+      top: 10px; right: 10px;
+      font-size: 16px; padding: 6px 10px;
+      background: #ff4444; color: white;
+      border: none; border-radius: 4px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+
+<div id="contador">Latas recicladas: 0</div>
+<button id="reset-top">Resetear Top</button>
+
+<a-scene physics="debug: false" background="color: #F0F4F8">
+
+  <!-- CONTROLES OCULUS -->
+  <a-entity laser-controls="hand: left" raycaster="objects: .clickable" super-hands></a-entity>
+  <a-entity laser-controls="hand: right" raycaster="objects: .clickable" super-hands></a-entity>
+
+  <!-- MOVIMIENTO CON JOYSTICK -->
+  <a-entity id="rig"
+            movement-controls="speed: 0.15"
+            gamepad-controls="controller: 0"
+            position="0 1.6 0">
+    <a-entity camera look-controls position="0 0 0">
+      <a-entity cursor="fuse: false"
+                raycaster="objects: .clickable"
+                position="0 0 -1"
+                geometry="primitive: ring; radiusInner: 0.02; radiusOuter: 0.03"
+                material="color: #00ffff; shader: flat">
+      </a-entity>
+    </a-entity>
+  </a-entity>
+
+  <!-- SKY -->
+  <a-assets>
+    <a-asset-item id="model" src="coca_can.glb"></a-asset-item>
+    <a-asset-item id="trash" src="can.glb"></a-asset-item>
+    <a-asset-item id="arm" src="arm.glb"></a-asset-item>
+    <a-asset-item id="vending" src="vending.glb"></a-asset-item>
+    <a-asset-item id="tree" src="tree.glb"></a-asset-item>
+    <img id="sky" src="https://cdn.aframe.io/360-image-gallery-boilerplate/img/sechelt.jpg">
+  </a-assets>
+
+  <a-sky src="#sky"></a-sky>
+
+  <!-- LUCES -->
+  <a-entity light="type: ambient; intensity: 2"></a-entity>
+  <a-entity light="type: directional; intensity: 3" position="0 10 10" shadow="cast: true"></a-entity>
+
+  <!-- SUELO -->
+  <a-plane rotation="-90 0 0" width="30" height="30" color="#cccccc"
+           shadow="receive: true" static-body></a-plane>
+
+  <!-- OBJETOS -->
+  <a-entity id="entorno">
+    <a-entity gltf-model="#tree" position="0 0 0" scale="1 1 1"></a-entity>
+    <a-entity id="bote" gltf-model="#trash" position="-2 0 -3" scale="0.005 0.005 0.005" static-body></a-entity>
+    <a-entity id="brazo" gltf-model="#arm" position="-3.5 0 -3" scale="0.9 0.9 0.9" rotation="0 180 0"></a-entity>
+    <a-entity id="expendedora" gltf-model="#vending" class="clickable"
+              position="2 1.2 -3" rotation="0 180 0"
+              scale="1.2 1.2 1.2"></a-entity>
+  </a-entity>
+
+  <!-- TEXTO 3D -->
+  <a-text id="contador3d"
+          value="Latas recicladas: 0"
+          position="-1.5 2 -2"
+          color="#3A8EBA"
+          width="4"
+          align="left"
+          font="mozillavr"
+          scale="1 1 1">
+  </a-text>
+
+  <!-- SCRIPT -->
+  <script>
+    const maxLatas = 5;
+    let contadorLatas = 0;
+    let latasRecicladasEnRonda = 0;
+    const contadorDiv = document.getElementById('contador');
+    const contador3d = document.querySelector('#contador3d');
+    const posicionesOcupadas = [];
+    const contenedorEntorno = document.querySelector('#entorno');
+
+    document.getElementById('reset-top').addEventListener('click', () => {
+      localStorage.removeItem('topScore');
+      contadorDiv.textContent = 'Latas recicladas: 0';
+      contador3d.setAttribute('value', 'Latas recicladas: 0');
+      alert('Top Score reiniciado');
+    });
+
+    function generarPosicionAleatoria() {
+      let x, z, safe = false;
+      while (!safe) {
+        x = (Math.random() * 8) - 4;
+        z = (Math.random() * 6) - 6;
+        safe = true;
+        const puntosOmitir = [{x: -2, z: -3}, {x: 2, z: -3}];
+        for (const p of puntosOmitir) {
+          if (Math.hypot(x - p.x, z - p.z) < 1.5) safe = false;
+        }
+        for (const pos of posicionesOcupadas) {
+          if (Math.hypot(x - pos.x, z - pos.z) < 1.0) safe = false;
+        }
+      }
+      return { x, y: 0.5, z };
+    }
+
+    function crearLata(id) {
+      const lata = document.createElement('a-entity');
+      lata.setAttribute('gltf-model', '#model');
+      lata.setAttribute('scale', '0.09 0.09 0.09');
+      lata.setAttribute('class', 'clickable grabbable');
+      lata.setAttribute('shadow', 'cast: true');
+      lata.setAttribute('dynamic-body', 'mass: 0.5');
+      lata.setAttribute('id', 'lata' + id);
+
+      const pos = generarPosicionAleatoria();
+      posicionesOcupadas.push(pos);
+      lata.setAttribute('position', `${pos.x} ${pos.y} ${pos.z}`);
+      lata.isMoving = false;
+
+      lata.addEventListener('grab-end', () => {
+        if (lata.isMoving) return;
+        lata.isMoving = true;
+        lata.setAttribute('animation__toBote', {
+          property: 'position',
+          to: '-2 0.5 -3',
+          dur: 1500,
+          easing: 'easeInOutQuad'
+        });
+        lata.addEventListener('animationcomplete__toBote', () => {
+          contadorLatas++;
+          latasRecicladasEnRonda++;
+          contadorDiv.textContent = `Latas recicladas: ${contadorLatas}`;
+          contador3d.setAttribute('value', `Latas recicladas: ${contadorLatas}`);
+          lata.setAttribute('visible', false);
+          if (latasRecicladasEnRonda >= maxLatas) generarLatas();
+        }, { once: true });
+      });
+
+      contenedorEntorno.appendChild(lata);
+    }
+
+    function generarLatas() {
+      posicionesOcupadas.length = 0;
+      latasRecicladasEnRonda = 0;
+      const previas = document.querySelectorAll('[id^=lata]');
+      previas.forEach(l => l.parentNode.removeChild(l));
+      for (let i = 0; i < maxLatas; i++) crearLata(i);
+    }
+
+    document.querySelector('#expendedora').addEventListener('click', () => {
+      const visibles = document.querySelectorAll('[id^=lata][visible="true"]');
+      if (visibles.length === 0) generarLatas();
+    });
+
+    generarLatas();
+  </script>
+</a-scene>
+</body>
+</html>
