@@ -40,18 +40,23 @@
 
   <!-- MOVIMIENTO CON JOYSTICK -->
   <a-entity id="rig"
-            movement-controls="speed: 0.15"
-            gamepad-controls="controller: 0"
-            position="0 1.6 0">
-    <a-entity camera look-controls position="0 0 0">
-      <a-entity cursor="fuse: false"
-                raycaster="objects: .clickable"
-                position="0 0 -1"
-                geometry="primitive: ring; radiusInner: 0.02; radiusOuter: 0.03"
-                material="color: #00ffff; shader: flat">
-      </a-entity>
+          movement-controls="fly: false; speed: 0.15"
+          wasd-controls
+          gamepad-controls
+          position="0 1.6 0">
+
+  <a-entity camera
+            look-controls="pointerLockEnabled: true"
+            position="0 0 0">
+    <a-entity cursor="fuse: false"
+              raycaster="objects: .clickable"
+              position="0 0 -1"
+              geometry="primitive: ring; radiusInner: 0.02; radiusOuter: 0.03"
+              material="color: #00ffff; shader: flat">
     </a-entity>
   </a-entity>
+</a-entity>
+
 
   <!-- SKY -->
   <a-assets>
